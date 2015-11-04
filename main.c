@@ -58,9 +58,10 @@ static unsigned char *readctscan (const char *path) {
         if (fscanf(file, "%c", &buffer[i]) != 1)
             goto error;
 
+    fclose(file);
     return buffer;
 
-error:
+  error:
     free(buffer);
     fclose(file);
     return NULL;
