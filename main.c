@@ -18,12 +18,31 @@
 #define IMG_NX 128
 #define IMG_NY 99
 
+#define H 4.5
+#define THRESHOLD 0.6
+
 #define idx(i, j, k) ((k) * NY * NX + (j) * NX + (i))
 
+typedef struct RayData {
+    unsigned char *volume;
+    int i;
+    int k;
+} RayData;
+
+/* IO */
 static unsigned char *readctscan (const char *path);
 static unsigned char *visualize (unsigned char *volume);
-static double getvalue (unsigned char *volume, int i, int j, int k, double s);
 static int writepgm (const char *path, unsigned char *buffer, int nx, int ny);
+
+/* Calculation */
+static double getvalue (unsigned char *volume, int i, int k, double s);
+static double ray (unsigned char *volume, int i, int k);
+static double volumetric_function (double s, void *data);
+static double transfer_function (double s, void *data);
+static double composite_simpson (double a, double b,
+        double (*f)(double x, void *data), void *data);
+static double simpson (double a, double b, double (*f)(double x, void *data),
+                       void *data);
 
 int main () {
     unsigned char *volume = readctscan("head-8bit.raw");
@@ -71,27 +90,16 @@ static unsigned char *visualize (unsigned char *volume) {
 
     for (int i = 0; i < IMG_NX; ++i) {
         for (int j = 0; j < IMG_NY; ++j) {
-            double ray1 = getvalue(volume, 2 * i, 0, j, 100);
-            double ray2 = getvalue(volume, 2 * i + 1, 0, j, 100);
-            image[i + IMG_NX * j] = (unsigned char)(255 * (ray1 + ray2) / 2);
+            double ray1 = ray(volume, 2 * i, j);
+            double ray2 = ray(volume, 2 * i + 1, j);
+            double value = (ray1 + ray2) / 2;
+            int index = i + IMG_NX * j;
+            printf("Ray: (%d, %d)\n", i, j);
+            image[index] = (unsigned char)(255 * value);
         }
     }
 
     return image;
-}
-
-static double getvalue (unsigned char *volume, int i, int j, int k, double s) {
-    int s1 = floor(s);
-    int s2 = ceil(s);
-
-    if (s1 > NY || s2 > NY)
-        return volume[idx(i, NY - 1, k)] / 255.0;
-
-    double v1 = volume[idx(i, j + s1, k)] / 255.0;
-    double v2 = volume[idx(i, j + s2, k)] / 255.0;
-    double intpart;
-    double alpha = modf(s, &intpart);
-    return v1 * (1 - alpha) + v2 * alpha;
 }
 
 static int writepgm (const char *path, unsigned char *buffer, int nx, int ny) {
@@ -108,5 +116,65 @@ static int writepgm (const char *path, unsigned char *buffer, int nx, int ny) {
     fclose(file);
 
     return 0;
+}
+
+static double getvalue (unsigned char *volume, int i, int k, double s) {
+    int s1 = floor(s);
+    int s2 = ceil(s);
+
+    if (s1 > NY || s2 > NY)
+        return volume[idx(i, NY - 1, k)] / 255.0;
+
+    double v1 = volume[idx(i, s1, k)] / 255.0;
+    double v2 = volume[idx(i, s2, k)] / 255.0;
+    double intpart;
+    double alpha = modf(s, &intpart);
+    return v1 * (1 - alpha) + v2 * alpha;
+}
+
+static double ray (unsigned char *volume, int i, int k) {
+    RayData data = {volume, i, k};
+    double value = composite_simpson(0, NY - 1, volumetric_function, &data);
+    if (value > 1)
+        return 1;
+    else
+        return value;
+}
+
+static double volumetric_function (double s, void *data) {
+    return transfer_function(s, data)
+           * exp(-composite_simpson(0, s, transfer_function, data));
+}
+
+static double transfer_function (double s, void *data) {
+    RayData *ray = (RayData *)data;
+    double d = getvalue(ray->volume, ray->i, ray->k, s);
+    double threshold = THRESHOLD;
+    if (d < threshold)
+        return 0;
+    else
+        return 0.05 * (d - threshold);
+}
+
+static double composite_simpson (double start, double end,
+        double (*f)(double x, void *data), void *data) {
+    double a = start;
+    double b = H;
+    double sum = 0;
+
+    while (1) {
+        if (b > end)
+            return sum + simpson(a, end, f, data);
+        sum += simpson(a, b, f, data);
+        a = b;
+        b = b + H;
+    }
+    return 0;
+}
+
+static double simpson (double a, double b, double (*f)(double x, void *data),
+                       void *data) {
+    double h = b - a;
+    return (h / 6) * (f(a, data) + 4 * f((a + b) / 2, data) + f(b, data));
 }
 

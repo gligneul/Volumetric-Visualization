@@ -6,7 +6,7 @@
 # Trabalho Final: Visualização Volumétrica
 
 target=visualizator
-cflags=-std=c99 -Wall -Wextra -Werror
+cflags=-std=c99 -Wall -Wextra
 lflags=-lm
 opt=-O2 -g
 
