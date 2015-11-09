@@ -7,6 +7,7 @@
  * Trabalho Final: Visualização Volumétrica
  */
 
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -17,26 +18,24 @@
 #define IMG_NX 128
 #define IMG_NY 99
 
+#define idx(i, j, k) ((k) * NY * NX + (j) * NX + (i))
+
 static unsigned char *readctscan (const char *path);
 static unsigned char *visualize (unsigned char *volume);
+static double getvalue (unsigned char *volume, int i, int j, int k, double s);
 static int writepgm (const char *path, unsigned char *buffer, int nx, int ny);
 
-int main (int argc, char *argv[]) {
-    if (argc < 2) {
-        fputs("The .raw file must be sent as argument", stderr);
-        return 1;
-    }
-
-    unsigned char *volume = readctscan(argv[1]);
+int main () {
+    unsigned char *volume = readctscan("head-8bit.raw");
     if (!volume) {
-        fputs("Unable to open the .raw file", stderr);
+        fputs("Unable to open the .raw file\n", stderr);
         return 1;
     }
 
     unsigned char *image = visualize(volume);
     free(volume);
     if (writepgm("out.pgm", image, IMG_NX, IMG_NY)) {
-        fputs("Unable to write the output image", stderr);
+        fputs("Unable to write the output image\n", stderr);
         return 1;
     }
 
@@ -72,11 +71,27 @@ static unsigned char *visualize (unsigned char *volume) {
 
     for (int i = 0; i < IMG_NX; ++i) {
         for (int j = 0; j < IMG_NY; ++j) {
-            image[i + IMG_NX * j] = volume[i + 30 * NX + j * NY * NX];
+            double ray1 = getvalue(volume, 2 * i, 0, j, 100);
+            double ray2 = getvalue(volume, 2 * i + 1, 0, j, 100);
+            image[i + IMG_NX * j] = (unsigned char)(255 * (ray1 + ray2) / 2);
         }
     }
 
     return image;
+}
+
+static double getvalue (unsigned char *volume, int i, int j, int k, double s) {
+    int s1 = floor(s);
+    int s2 = ceil(s);
+
+    if (s1 > NY || s2 > NY)
+        return volume[idx(i, NY - 1, k)] / 255.0;
+
+    double v1 = volume[idx(i, j + s1, k)] / 255.0;
+    double v2 = volume[idx(i, j + s2, k)] / 255.0;
+    double intpart;
+    double alpha = modf(s, &intpart);
+    return v1 * (1 - alpha) + v2 * alpha;
 }
 
 static int writepgm (const char *path, unsigned char *buffer, int nx, int ny) {
