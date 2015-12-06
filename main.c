@@ -67,7 +67,7 @@ int main ()
     printf("Mean squared error:\n");
     printf("h\terror\n");
     unsigned char *bestimage = visualize(volume, 1);
-    for (int i = 2; i < 20; ++i)
+    for (int i = 2; i < 20; i += 2)
         test_image(volume, bestimage, i);
     free(bestimage);
 
@@ -122,7 +122,7 @@ static void test_image (unsigned char *volume, unsigned char *bestimage,
     clock_t start = clock();
     unsigned char *image = visualize(volume, h);
     clock_t end = clock();
-    double time = (end - start)/(double)CLOCKS_PER_SEC;
+    double time = (end - start) / (double)CLOCKS_PER_SEC;
     printf("%g\t%g\t%g\n", h, mean_squared_error(bestimage, image), time);
     free(image);
 }
@@ -149,7 +149,7 @@ static double getvalue (unsigned char *volume, int i, int k, double s)
     int s1 = floor(s);
     int s2 = ceil(s);
 
-    if (s1 >= NY || s2 >= NY)
+    if (s2 >= NY)
         return volume[idx(i, NY - 1, k)] / 255.0;
 
     double v1 = volume[idx(i, s1, k)] / 255.0;
@@ -221,6 +221,6 @@ static double mean_squared_error (unsigned char *a, unsigned char *b)
         }
         err += lineerr;
     }
-    return err / IMG_NX * IMG_NY;
+    return err / (IMG_NX * IMG_NY);
 }
 
