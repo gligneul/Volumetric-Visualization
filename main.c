@@ -67,8 +67,8 @@ int main ()
     printf("Mean squared error:\n");
     printf("h\terror\n");
     unsigned char *bestimage = visualize(volume, 1);
-    for (int i = 2; i < 20; i += 2)
-        test_image(volume, bestimage, i);
+    for (int i = 1; i < 10; ++i)
+        test_image(volume, bestimage, i * 4.5);
     free(bestimage);
 
     free(volume);
@@ -215,10 +215,8 @@ static double mean_squared_error (unsigned char *a, unsigned char *b)
     double err = 0;
     for (int i = 0; i < IMG_NX ; ++i) {
         double lineerr = 0;
-        for (int j = 0; j < IMG_NY; ++j) {
-            double e = a[i + IMG_NX * j] - b[i + IMG_NX * j];
-            lineerr += e * e;
-        }
+        for (int j = 0; j < IMG_NY; ++j)
+            lineerr += abs(a[i + IMG_NX * j] - b[i + IMG_NX * j]) / 2.55;
         err += lineerr;
     }
     return err / (IMG_NX * IMG_NY);
